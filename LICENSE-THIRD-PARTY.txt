@@ -1,0 +1,8 @@
+Ce plugin inclut la bibliothèque suivante :
+
+qrcode-generator
+Copyright (c) 2009 Kazuhiko Arase
+Licence MIT
+
+Source utilisée : assets/js/qrcode.js
+Références : voir le dépôt officiel qrcode-generator.
