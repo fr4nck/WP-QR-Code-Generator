@@ -2,7 +2,7 @@
 Contributors: fr4nck
 Tags: qr-code, generator, wifi, vcard, event, privacy
 Requires at least: 6.0
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -14,6 +14,8 @@ Générateur autonome de QR codes pour WordPress, sans stockage des contenus ni 
 WP QR Code Generator permet d’intégrer un générateur complet dans une page WordPress avec le shortcode [wpqr].
 
 Types pris en charge : texte, lien web, Wi-Fi, téléphone, e-mail, SMS, GPS, événement iCalendar et contact vCard.
+
+Les coordonnées générales d’un organisme peuvent être enregistrées dans les réglages afin de préremplir facultativement les fiches de contact. Les données propres à chaque personne ne sont pas conservées.
 
 Les QR codes sont générés localement dans le navigateur et peuvent être téléchargés en PNG ou SVG.
 
@@ -30,6 +32,13 @@ Les QR codes sont générés localement dans le navigateur et peuvent être tél
 Les contenus saisis ne sont pas enregistrés dans WordPress et ne sont pas transmis à un service externe.
 
 == Changelog ==
+
+= 1.2.0 =
+* Ajout d’une section « Coordonnées de l’organisme » dans les réglages.
+* Préremplissage facultatif des fiches de contact vCard.
+* Ajout des champs fonction, service, code postal, ville et pays.
+* Amélioration du format vCard pour les coordonnées professionnelles.
+* Les coordonnées ponctuelles saisies dans le générateur restent non enregistrées.
 
 = 1.1.0 =
 * Ajout du QR code Événement au format iCalendar.

@@ -22,6 +22,8 @@ Aucune donnée saisie n’est enregistrée par le plugin ni transmise à un serv
 - coordonnées GPS ;
 - événements au format iCalendar ;
 - fiches de contact au format vCard ;
+- coordonnées générales d’un organisme enregistrables dans les réglages ;
+- préremplissage facultatif des vCards à partir de ces coordonnées ;
 - téléchargement au format PNG ;
 - export vectoriel au format SVG ;
 - génération locale dans le navigateur ;
@@ -84,7 +86,9 @@ Crée un événement iCalendar avec titre, date, horaires, lieu et description.
 
 ### Contact
 
-Crée une fiche de contact au format vCard pouvant contenir un nom, une organisation, un téléphone, une adresse e-mail et une adresse postale.
+Crée une fiche de contact au format vCard pouvant contenir un nom, une fonction, un organisme, un service, un téléphone, une adresse e-mail, un site internet et une adresse postale.
+
+Les coordonnées générales d’une association, d’une entreprise, d’une collectivité, d’une école ou de tout autre organisme peuvent être enregistrées dans les réglages WordPress. Un bouton permet ensuite de les charger dans le formulaire Contact sans enregistrer les informations propres à la personne.
 
 ## Installation
 
@@ -106,7 +110,8 @@ Depuis les réglages WordPress, il est possible de configurer :
 - le logo central ;
 - la taille du logo central ;
 - les couleurs du QR code ;
-- la taille et la marge par défaut.
+- la taille et la marge par défaut ;
+- les coordonnées générales de l’organisme utilisées pour préremplir les vCards.
 
 Aucun logo n’est imposé ou fourni par défaut.
 
@@ -120,7 +125,7 @@ Les informations saisies ne sont :
 - ni conservées dans un historique ;
 - ni envoyées à un service externe de génération de QR codes.
 
-Seuls les réglages généraux du plugin sont enregistrés dans WordPress.
+Seuls les réglages généraux du plugin et les coordonnées de l’organisme saisies volontairement par un administrateur sont enregistrés dans WordPress.
 
 ## Bibliothèque utilisée
 

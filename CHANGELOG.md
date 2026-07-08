@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## 1.2.0
+
+- ajout d’une section « Coordonnées de l’organisme » dans les réglages WordPress ;
+- préremplissage facultatif des fiches de contact vCard ;
+- ajout des champs fonction, service, code postal, ville et pays ;
+- amélioration du format vCard pour les coordonnées professionnelles ;
+- conservation du principe de confidentialité : seules les coordonnées générales configurées par l’administrateur sont enregistrées.
+
 ## 1.1.0
 
 - ajout du QR code Événement au format iCalendar ;

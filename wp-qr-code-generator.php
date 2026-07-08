@@ -2,8 +2,8 @@
 /**
  * Plugin Name: WP QR Code Generator
  * Plugin URI: https://github.com/fr4nck/Wp-Qr-code-Generator
- * Description: Générateur autonome de QR codes texte, lien web, Wi-Fi, téléphone, e-mail, SMS, GPS, événement et contact, avec export PNG/SVG et logos optionnels.
- * Version: 1.1.0
+ * Description: Générateur autonome de QR codes avec export PNG/SVG, logos optionnels et préremplissage vCard depuis les coordonnées d’un organisme.
+ * Version: 1.2.0
  * Author: Franck Bellardie
  * License: GPL-2.0-or-later
  * Text Domain: wp-qr-code-generator
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 
 final class WPQR_Plugin {
     private const OPTION_KEY = 'wpqr_options';
-    private const VERSION = '1.1.0';
+    private const VERSION = '1.2.0';
     private const MAX_LOGO_RATIO = 0.22;
 
     public function __construct() {
@@ -131,6 +131,44 @@ final class WPQR_Plugin {
                 ['key' => $key]
             );
         }
+
+        add_settings_section(
+            'wpqr_organization_section',
+            'Coordonnées de l’organisme',
+            function () {
+                echo '<p>Ces informations sont facultatives. Elles peuvent être chargées dans le formulaire Contact afin de créer rapidement des vCards pour une association, une entreprise, une collectivité, une école ou tout autre organisme.</p>';
+                echo '<p>Seules ces coordonnées générales sont enregistrées dans WordPress. Les informations saisies ponctuellement dans le générateur ne sont pas conservées.</p>';
+            },
+            'wp-qr-code-generator'
+        );
+
+        $organization_fields = [
+            'org_name' => ['label' => 'Nom de l’organisme', 'type' => 'text', 'placeholder' => 'Nom complet'],
+            'org_acronym' => ['label' => 'Sigle', 'type' => 'text', 'placeholder' => 'Sigle ou nom court'],
+            'org_department' => ['label' => 'Service ou établissement', 'type' => 'text', 'placeholder' => 'Service, établissement ou antenne'],
+            'org_address' => ['label' => 'Adresse', 'type' => 'textarea', 'placeholder' => 'Numéro et voie'],
+            'org_postcode' => ['label' => 'Code postal', 'type' => 'text', 'placeholder' => '35000'],
+            'org_city' => ['label' => 'Ville', 'type' => 'text', 'placeholder' => 'Rennes'],
+            'org_country' => ['label' => 'Pays', 'type' => 'text', 'placeholder' => 'France'],
+            'org_phone' => ['label' => 'Téléphone général', 'type' => 'tel', 'placeholder' => '+33299000000'],
+            'org_email' => ['label' => 'E-mail général', 'type' => 'email', 'placeholder' => 'contact@exemple.org'],
+            'org_website' => ['label' => 'Site internet', 'type' => 'url', 'placeholder' => 'https://exemple.org/'],
+        ];
+
+        foreach ($organization_fields as $key => $field) {
+            add_settings_field(
+                'wpqr_' . $key,
+                $field['label'],
+                [$this, 'render_field'],
+                'wp-qr-code-generator',
+                'wpqr_organization_section',
+                [
+                    'key' => $key,
+                    'type' => $field['type'],
+                    'placeholder' => $field['placeholder'],
+                ]
+            );
+        }
     }
 
     public function sanitize_options($input): array {
@@ -162,6 +200,17 @@ final class WPQR_Plugin {
         $ratio = max(0.08, min(self::MAX_LOGO_RATIO, $ratio));
         $output['center_image_size_ratio'] = number_format($ratio, 2, '.', '');
 
+        $output['org_name'] = sanitize_text_field($input['org_name'] ?? $defaults['org_name']);
+        $output['org_acronym'] = sanitize_text_field($input['org_acronym'] ?? $defaults['org_acronym']);
+        $output['org_department'] = sanitize_text_field($input['org_department'] ?? $defaults['org_department']);
+        $output['org_address'] = sanitize_textarea_field($input['org_address'] ?? $defaults['org_address']);
+        $output['org_postcode'] = sanitize_text_field($input['org_postcode'] ?? $defaults['org_postcode']);
+        $output['org_city'] = sanitize_text_field($input['org_city'] ?? $defaults['org_city']);
+        $output['org_country'] = sanitize_text_field($input['org_country'] ?? $defaults['org_country']);
+        $output['org_phone'] = sanitize_text_field($input['org_phone'] ?? $defaults['org_phone']);
+        $output['org_email'] = sanitize_email($input['org_email'] ?? $defaults['org_email']);
+        $output['org_website'] = esc_url_raw($input['org_website'] ?? $defaults['org_website']);
+
         return $output;
     }
 
@@ -183,6 +232,16 @@ final class WPQR_Plugin {
             'logo_enabled' => '0',
             'center_image_id' => 0,
             'center_image_size_ratio' => '0.18',
+            'org_name' => '',
+            'org_acronym' => '',
+            'org_department' => '',
+            'org_address' => '',
+            'org_postcode' => '',
+            'org_city' => '',
+            'org_country' => '',
+            'org_phone' => '',
+            'org_email' => '',
+            'org_website' => '',
         ];
     }
 
@@ -223,9 +282,42 @@ final class WPQR_Plugin {
 
     public function render_field(array $args): void {
         $key = $args['key'];
+        $type = $args['type'] ?? '';
+        $placeholder = $args['placeholder'] ?? '';
         $options = $this->get_options();
         $value = $options[$key] ?? '';
         $name = self::OPTION_KEY . '[' . $key . ']';
+
+        if ($type === 'textarea') {
+            printf(
+                '<textarea class="large-text" rows="3" name="%1$s" placeholder="%2$s">%3$s</textarea>',
+                esc_attr($name),
+                esc_attr($placeholder),
+                esc_textarea((string) $value)
+            );
+            return;
+        }
+
+        if (in_array($type, ['email', 'url', 'tel'], true)) {
+            printf(
+                '<input type="%1$s" class="regular-text" name="%2$s" value="%3$s" placeholder="%4$s">',
+                esc_attr($type),
+                esc_attr($name),
+                esc_attr((string) $value),
+                esc_attr($placeholder)
+            );
+            return;
+        }
+
+        if ($type === 'text') {
+            printf(
+                '<input type="text" class="regular-text" name="%1$s" value="%2$s" placeholder="%3$s">',
+                esc_attr($name),
+                esc_attr((string) $value),
+                esc_attr($placeholder)
+            );
+            return;
+        }
 
         switch ($key) {
             case 'logo_enabled':
@@ -299,6 +391,7 @@ final class WPQR_Plugin {
             <p>Types disponibles : Texte, Lien web, Wi-Fi, Téléphone, E-mail, SMS, GPS, Événement et Contact.</p>
             <p>Les QR codes sont générés localement dans le navigateur et peuvent être téléchargés en PNG ou SVG.</p>
             <p>Les contenus saisis par les visiteurs ne sont ni enregistrés dans WordPress ni envoyés à un service externe.</p>
+            <p>La section <strong>Coordonnées de l’organisme</strong> permet de préremplir facultativement les fiches de contact vCard.</p>
             <form method="post" action="options.php">
                 <?php
                 settings_fields('wpqr_group');
@@ -513,17 +606,36 @@ final class WPQR_Plugin {
         $this->panel_close();
     }
 
-    private function render_panel_contact(string $instance_id): void {
+    private function render_panel_contact(string $instance_id, bool $organization_available): void {
         $this->panel_open($instance_id, 'contact');
         ?>
+            <?php if ($organization_available) : ?>
+                <div class="wpqr-organization-prefill" role="note">
+                    <div>
+                        <strong>Coordonnées de l’organisme disponibles</strong>
+                        <p>Chargez les informations générales enregistrées dans les réglages, puis complétez ou remplacez les champs propres à la personne.</p>
+                    </div>
+                    <button type="button" class="wpqr-button is-secondary" data-action="load-organization">Utiliser les coordonnées de l’organisme</button>
+                </div>
+            <?php endif; ?>
             <div class="wpqr-grid wpqr-grid--two">
                 <label>
-                    <span>Nom</span>
-                    <input type="text" name="contact_name" placeholder="Nom">
+                    <span>Nom complet</span>
+                    <input type="text" name="contact_name" placeholder="Prénom et nom">
                 </label>
                 <label>
-                    <span>Organisation</span>
-                    <input type="text" name="contact_org" placeholder="Organisation">
+                    <span>Fonction</span>
+                    <input type="text" name="contact_title" placeholder="Fonction ou poste">
+                </label>
+            </div>
+            <div class="wpqr-grid wpqr-grid--two">
+                <label>
+                    <span>Organisme</span>
+                    <input type="text" name="contact_org" placeholder="Association, entreprise, collectivité…">
+                </label>
+                <label>
+                    <span>Service ou établissement</span>
+                    <input type="text" name="contact_department" placeholder="Service, établissement ou antenne">
                 </label>
             </div>
             <div class="wpqr-grid wpqr-grid--two">
@@ -542,13 +654,27 @@ final class WPQR_Plugin {
             </label>
             <label>
                 <span>Adresse</span>
-                <textarea name="contact_address" rows="3" placeholder="Adresse postale"></textarea>
+                <textarea name="contact_address" rows="2" placeholder="Numéro et voie"></textarea>
+            </label>
+            <div class="wpqr-grid wpqr-grid--two">
+                <label>
+                    <span>Code postal</span>
+                    <input type="text" name="contact_postcode" inputmode="numeric" placeholder="35000">
+                </label>
+                <label>
+                    <span>Ville</span>
+                    <input type="text" name="contact_city" placeholder="Rennes">
+                </label>
+            </div>
+            <label>
+                <span>Pays</span>
+                <input type="text" name="contact_country" placeholder="France">
             </label>
             <label>
                 <span>Note</span>
                 <textarea name="contact_note" rows="3" placeholder="Informations complémentaires"></textarea>
             </label>
-            <p class="wpqr-field-note">Ce mode génère une fiche vCard enregistrable dans les contacts du téléphone.</p>
+            <p class="wpqr-field-note">Ce mode génère une fiche vCard enregistrable dans les contacts du téléphone. Les données saisies ponctuellement ne sont pas conservées.</p>
         <?php
         $this->panel_close();
     }
@@ -568,6 +694,20 @@ final class WPQR_Plugin {
         wp_enqueue_script('wpqr-script');
 
         $instance_id = wp_unique_id('wpqr-');
+        $organization = [
+            'name' => (string) $options['org_name'],
+            'acronym' => (string) $options['org_acronym'],
+            'department' => (string) $options['org_department'],
+            'address' => (string) $options['org_address'],
+            'postcode' => (string) $options['org_postcode'],
+            'city' => (string) $options['org_city'],
+            'country' => (string) $options['org_country'],
+            'phone' => (string) $options['org_phone'],
+            'email' => (string) $options['org_email'],
+            'website' => (string) $options['org_website'],
+        ];
+        $organization_available = count(array_filter($organization, static fn($value) => $value !== '')) > 0;
+
         $data = [
             'dark' => $options['qr_dark'],
             'light' => $options['qr_light'],
@@ -577,6 +717,7 @@ final class WPQR_Plugin {
             'centerImageUrl' => $center_logo_url,
             'centerImageSizeRatio' => min((float) $options['center_image_size_ratio'], self::MAX_LOGO_RATIO),
             'maxLogoRatio' => self::MAX_LOGO_RATIO,
+            'organization' => $organization,
         ];
 
         $tabs = [
@@ -642,7 +783,7 @@ final class WPQR_Plugin {
                 $this->render_panel_sms($instance_id);
                 $this->render_panel_gps($instance_id);
                 $this->render_panel_event($instance_id);
-                $this->render_panel_contact($instance_id);
+                $this->render_panel_contact($instance_id, $organization_available);
                 ?>
 
                 <div class="wpqr-grid">

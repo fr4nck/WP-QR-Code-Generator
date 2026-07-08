@@ -72,24 +72,34 @@
 
   function buildVCard(root) {
     const name = qs(root, '[name="contact_name"]').value.trim();
+    const title = qs(root, '[name="contact_title"]').value.trim();
     const org = qs(root, '[name="contact_org"]').value.trim();
+    const department = qs(root, '[name="contact_department"]').value.trim();
     const phone = qs(root, '[name="contact_phone"]').value.trim();
     const email = qs(root, '[name="contact_email"]').value.trim();
     const url = normalizeUrl(qs(root, '[name="contact_url"]').value);
     const address = qs(root, '[name="contact_address"]').value.trim();
+    const postcode = qs(root, '[name="contact_postcode"]').value.trim();
+    const city = qs(root, '[name="contact_city"]').value.trim();
+    const country = qs(root, '[name="contact_country"]').value.trim();
     const note = qs(root, '[name="contact_note"]').value.trim();
 
-    if (!name && !org && !phone && !email && !url && !address && !note) {
+    if (!name && !title && !org && !department && !phone && !email && !url && !address && !postcode && !city && !country && !note) {
       return '';
     }
 
     const lines = ['BEGIN:VCARD', 'VERSION:3.0'];
     if (name) lines.push('FN:' + escapeVCard(name));
-    if (org) lines.push('ORG:' + escapeVCard(org));
-    if (phone) lines.push('TEL:' + escapeVCard(phone));
-    if (email) lines.push('EMAIL:' + escapeVCard(email));
+    if (org || department) {
+      lines.push('ORG:' + [org, department].map(escapeVCard).join(';'));
+    }
+    if (title) lines.push('TITLE:' + escapeVCard(title));
+    if (phone) lines.push('TEL;TYPE=WORK,VOICE:' + escapeVCard(phone));
+    if (email) lines.push('EMAIL;TYPE=WORK:' + escapeVCard(email));
     if (url) lines.push('URL:' + escapeVCard(url));
-    if (address) lines.push('ADR:;;' + escapeVCard(address) + ';;;;');
+    if (address || postcode || city || country) {
+      lines.push('ADR;TYPE=WORK:;;' + [address, city, '', postcode, country].map(escapeVCard).join(';'));
+    }
     if (note) lines.push('NOTE:' + escapeVCard(note));
     lines.push('END:VCARD');
 
@@ -618,6 +628,39 @@
     });
   }
 
+
+  function loadOrganization(root, config) {
+    const organization = config && config.organization ? config.organization : {};
+    const mapping = {
+      contact_org: organization.name && organization.acronym
+        ? organization.name + ' (' + organization.acronym + ')'
+        : (organization.name || organization.acronym || ''),
+      contact_department: organization.department || '',
+      contact_phone: organization.phone || '',
+      contact_email: organization.email || '',
+      contact_url: organization.website || '',
+      contact_address: organization.address || '',
+      contact_postcode: organization.postcode || '',
+      contact_city: organization.city || '',
+      contact_country: organization.country || ''
+    };
+
+    let loaded = 0;
+    Object.keys(mapping).forEach((fieldName) => {
+      const field = qs(root, '[name="' + fieldName + '"]');
+      const value = String(mapping[fieldName] || '').trim();
+      if (!field || !value || field.value.trim()) return;
+      field.value = value;
+      loaded += 1;
+    });
+
+    if (loaded > 0) {
+      setStatus(root, 'Coordonnées de l’organisme chargées. Vous pouvez les compléter ou les modifier.', 'success');
+    } else {
+      setStatus(root, 'Aucun champ vide n’a pu être complété avec les coordonnées enregistrées.', 'warning');
+    }
+  }
+
   function clearCanvas(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -646,6 +689,7 @@
     const canvas = qs(root, '.wpqr-canvas');
     const errorCorrection = qs(root, '[name="ecLevel"]');
     const allDay = qs(root, '[name="event_all_day"]');
+    const organizationButton = qs(root, '[data-action="load-organization"]');
 
     if (config.logoEnabled) {
       errorCorrection.value = 'H';
@@ -653,6 +697,11 @@
     }
 
     if (allDay) allDay.addEventListener('change', () => syncEventAllDay(root));
+    if (organizationButton) {
+      organizationButton.addEventListener('click', function () {
+        loadOrganization(root, config);
+      });
+    }
 
     form.addEventListener('submit', function (event) {
       event.preventDefault();
