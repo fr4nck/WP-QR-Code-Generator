@@ -1,12 +1,14 @@
 <?php
 /**
  * Plugin Name: WP QR Code Generator
- * Plugin URI: https://wordpress.org/plugins/
- * Description: Générateur autonome de QR codes texte, lien web, Wi-Fi, téléphone, e-mail, SMS, GPS et contact, avec logos optionnels choisis depuis la médiathèque WordPress.
- * Version: 1.0
+ * Plugin URI: https://github.com/fr4nck/Wp-Qr-code-Generator
+ * Description: Générateur autonome de QR codes texte, lien web, Wi-Fi, téléphone, e-mail, SMS, GPS, événement et contact, avec export PNG/SVG et logos optionnels.
+ * Version: 1.1.0
  * Author: Franck Bellardie
  * License: GPL-2.0-or-later
  * Text Domain: wp-qr-code-generator
+ * Requires at least: 6.0
+ * Requires PHP: 7.4
  */
 
 if (!defined('ABSPATH')) {
@@ -15,7 +17,8 @@ if (!defined('ABSPATH')) {
 
 final class WPQR_Plugin {
     private const OPTION_KEY = 'wpqr_options';
-    private const VERSION = '1.0';
+    private const VERSION = '1.1.0';
+    private const MAX_LOGO_RATIO = 0.22;
 
     public function __construct() {
         add_action('admin_menu', [$this, 'register_admin_menu']);
@@ -99,6 +102,7 @@ final class WPQR_Plugin {
             'Réglages principaux',
             function () {
                 echo '<p>Réglez l’apparence du générateur. Aucun logo n’est fourni par défaut. Vous pouvez choisir un logo d’en-tête et/ou un logo central depuis la médiathèque WordPress.</p>';
+                echo '<p><strong>Sécurité du logo :</strong> lorsqu’un logo central est utilisé, le niveau de correction H est appliqué automatiquement et le ratio du logo est limité à 22&nbsp;%.</p>';
             },
             'wp-qr-code-generator'
         );
@@ -132,6 +136,7 @@ final class WPQR_Plugin {
     public function sanitize_options($input): array {
         $current = $this->get_options();
         $defaults = $this->get_default_options();
+        $input = is_array($input) ? $input : [];
         $output = wp_parse_args(is_array($current) ? $current : [], $defaults);
 
         $output['header_title'] = sanitize_text_field($input['header_title'] ?? $defaults['header_title']);
@@ -149,12 +154,12 @@ final class WPQR_Plugin {
 
         $output['header_logo_id'] = isset($input['header_logo_id']) ? absint($input['header_logo_id']) : 0;
         $output['center_image_id'] = isset($input['center_image_id']) ? absint($input['center_image_id']) : 0;
-
-
         $output['logo_enabled'] = empty($input['logo_enabled']) ? '0' : '1';
 
-        $ratio = isset($input['center_image_size_ratio']) ? (float) $input['center_image_size_ratio'] : (float) $defaults['center_image_size_ratio'];
-        $ratio = max(0.08, min(0.30, $ratio));
+        $ratio = isset($input['center_image_size_ratio'])
+            ? (float) $input['center_image_size_ratio']
+            : (float) $defaults['center_image_size_ratio'];
+        $ratio = max(0.08, min(self::MAX_LOGO_RATIO, $ratio));
         $output['center_image_size_ratio'] = number_format($ratio, 2, '.', '');
 
         return $output;
@@ -172,7 +177,7 @@ final class WPQR_Plugin {
             'header_logo_id' => 0,
             'subtitle' => 'Générez des QR codes utiles au quotidien',
             'qr_dark' => '#1f4b7a',
-            'qr_light' => '#fff7eb',
+            'qr_light' => '#ffffff',
             'default_size' => '320',
             'default_margin' => '16',
             'logo_enabled' => '0',
@@ -182,30 +187,27 @@ final class WPQR_Plugin {
     }
 
     private function get_options(): array {
-        $saved = get_option(self::OPTION_KEY, null);
-        if (!is_array($saved)) {
-            $saved = [];
-        }
-        return wp_parse_args($saved, $this->get_default_options());
+        $saved = get_option(self::OPTION_KEY, []);
+        return wp_parse_args(is_array($saved) ? $saved : [], $this->get_default_options());
     }
 
-    private function resolve_image_url(array $options, string $idKey): string {
-        $attachmentId = !empty($options[$idKey]) ? absint($options[$idKey]) : 0;
-        if ($attachmentId === 0) {
+    private function resolve_image_url(array $options, string $id_key): string {
+        $attachment_id = !empty($options[$id_key]) ? absint($options[$id_key]) : 0;
+        if ($attachment_id === 0) {
             return '';
         }
 
-        $url = wp_get_attachment_image_url($attachmentId, 'full');
+        $url = wp_get_attachment_image_url($attachment_id, 'full');
         return is_string($url) ? $url : '';
     }
 
-    private function render_media_field(string $name, int $value, string $imageUrl): void {
+    private function render_media_field(string $name, int $value, string $image_url): void {
         ?>
         <div class="wpqr-media-field">
             <input type="hidden" class="wpqr-media-input" name="<?php echo esc_attr($name); ?>" value="<?php echo esc_attr((string) $value); ?>">
-            <div class="wpqr-media-preview <?php echo $imageUrl ? '' : 'is-empty'; ?>">
-                <?php if ($imageUrl) : ?>
-                    <img src="<?php echo esc_url($imageUrl); ?>" alt="">
+            <div class="wpqr-media-preview <?php echo $image_url ? '' : 'is-empty'; ?>">
+                <?php if ($image_url) : ?>
+                    <img src="<?php echo esc_url($image_url); ?>" alt="">
                 <?php else : ?>
                     Aucune image sélectionnée
                 <?php endif; ?>
@@ -214,7 +216,7 @@ final class WPQR_Plugin {
                 <button type="button" class="button wpqr-media-select">Choisir une image</button>
                 <button type="button" class="button wpqr-media-remove">Retirer</button>
             </div>
-            <p class="wpqr-image-field-note">Utilisez de préférence une image carrée et nette. Le logo central ne doit pas être trop grand pour préserver la lisibilité du QR.</p>
+            <p class="wpqr-image-field-note">Utilisez de préférence une image carrée et nette. Le logo central est limité à 22&nbsp;% pour préserver la lisibilité du QR.</p>
         </div>
         <?php
     }
@@ -228,7 +230,7 @@ final class WPQR_Plugin {
         switch ($key) {
             case 'logo_enabled':
                 printf(
-                    '<label><input type="checkbox" name="%1$s" value="1" %2$s> Utiliser le logo au centre des nouveaux QR codes</label><p class="description">Le logo ne sera inséré que si une image centrale est choisie ci-dessous.</p>',
+                    '<label><input type="checkbox" name="%1$s" value="1" %2$s> Utiliser le logo au centre des nouveaux QR codes</label><p class="description">Le logo ne sera inséré que si une image centrale est choisie ci-dessous. La correction H sera imposée automatiquement.</p>',
                     esc_attr($name),
                     checked($value, '1', false)
                 );
@@ -264,14 +266,14 @@ final class WPQR_Plugin {
                 break;
             case 'default_margin':
                 printf(
-                    '<input type="number" min="0" max="80" step="1" name="%1$s" value="%2$s"> <span class="description">en pixels</span>',
+                    '<input type="number" min="0" max="80" step="1" name="%1$s" value="%2$s"> <span class="description">en pixels minimum ; une zone calme de quatre modules est garantie automatiquement</span>',
                     esc_attr($name),
                     esc_attr((string) $value)
                 );
                 break;
             case 'center_image_size_ratio':
                 printf(
-                    '<input type="number" min="0.08" max="0.30" step="0.01" name="%1$s" value="%2$s"> <p class="description">0.18 est un bon point de départ. Au-delà, la lecture peut devenir moins fiable.</p>',
+                    '<input type="number" min="0.08" max="0.22" step="0.01" name="%1$s" value="%2$s"> <p class="description">0.18 est un bon point de départ. La valeur maximale autorisée est 0.22.</p>',
                     esc_attr($name),
                     esc_attr((string) $value)
                 );
@@ -294,9 +296,9 @@ final class WPQR_Plugin {
         <div class="wrap">
             <h1>WP QR Code Generator</h1>
             <p>Shortcode : <code>[wpqr]</code></p>
-            <p>Cette version propose des onglets prêts à l’emploi : Texte, Lien web, Wi-Fi, Téléphone, E-mail, SMS, GPS et Contact.</p>
-            <p>Les contenus saisis par les visiteurs ne sont pas enregistrés. Ils servent uniquement à générer le QR code dans leur navigateur.</p>
-            <p><strong>Aucun logo n’est fourni par défaut.</strong> Vous pouvez choisir librement un logo d’en-tête et un logo central depuis la médiathèque.</p>
+            <p>Types disponibles : Texte, Lien web, Wi-Fi, Téléphone, E-mail, SMS, GPS, Événement et Contact.</p>
+            <p>Les QR codes sont générés localement dans le navigateur et peuvent être téléchargés en PNG ou SVG.</p>
+            <p>Les contenus saisis par les visiteurs ne sont ni enregistrés dans WordPress ni envoyés à un service externe.</p>
             <form method="post" action="options.php">
                 <?php
                 settings_fields('wpqr_group');
@@ -308,6 +310,25 @@ final class WPQR_Plugin {
         <?php
     }
 
+    private function panel_open(string $instance_id, string $mode, bool $active = false): void {
+        $panel_id = $instance_id . '-panel-' . $mode;
+        $tab_id = $instance_id . '-tab-' . $mode;
+        ?>
+        <div
+            id="<?php echo esc_attr($panel_id); ?>"
+            class="wpqr-panel<?php echo $active ? ' is-active' : ''; ?>"
+            data-panel="<?php echo esc_attr($mode); ?>"
+            role="tabpanel"
+            aria-labelledby="<?php echo esc_attr($tab_id); ?>"
+            <?php echo $active ? '' : 'hidden'; ?>
+        >
+        <?php
+    }
+
+    private function panel_close(): void {
+        echo '</div>';
+    }
+
     private function render_help_intro(): void {
         ?>
         <section class="wpqr-guidance" aria-label="Conseils d’utilisation">
@@ -316,8 +337,8 @@ final class WPQR_Plugin {
                 <div class="wpqr-helpbox-content">
                     <ul>
                         <li>Choisissez l’onglet correspondant au besoin pour éviter de saisir les formats techniques à la main.</li>
-                        <li>Pour l’impression, augmentez la taille et gardez une marge claire autour du code.</li>
-                        <li>Avec un logo central, le niveau de correction d’erreur <strong>H</strong> est recommandé.</li>
+                        <li>Pour l’impression, préférez l’export SVG, augmentez la taille et conservez une marge claire autour du code.</li>
+                        <li>Avec un logo central, la correction d’erreur H et une taille de logo prudente sont appliquées automatiquement.</li>
                         <li>Testez toujours le scan sur plusieurs téléphones avant diffusion.</li>
                     </ul>
                 </div>
@@ -326,50 +347,40 @@ final class WPQR_Plugin {
         <?php
     }
 
-    private function render_panel_text(): void {
+    private function render_panel_text(string $instance_id): void {
+        $this->panel_open($instance_id, 'text', true);
         ?>
-        <div class="wpqr-panel is-active" data-panel="text">
             <label>
                 <span>Texte à encoder</span>
                 <textarea name="text_payload" rows="4" placeholder="Bienvenue !"></textarea>
             </label>
-            <div class="wpqr-helpbox wpqr-helpbox-inline wpqr-helpbox-static">
-                <h3 class="wpqr-helpbox-title">Aide pour le mode Texte</h3>
-                <div class="wpqr-helpbox-content">
-                    <p>Utilisez ce mode pour un message libre, une consigne, un code d’accès, une référence ou n’importe quel contenu simple.</p>
-                </div>
-            </div>
-        </div>
+            <p class="wpqr-field-note">Message libre, consigne, code d’accès, référence ou toute autre information simple.</p>
         <?php
+        $this->panel_close();
     }
 
-    private function render_panel_url(): void {
+    private function render_panel_url(string $instance_id): void {
+        $this->panel_open($instance_id, 'url');
         ?>
-        <div class="wpqr-panel" data-panel="url">
             <label>
                 <span>Adresse web</span>
-                <input type="url" name="url_value" placeholder="https://exemple.org/">
+                <input type="url" name="url_value" inputmode="url" placeholder="https://exemple.org/">
             </label>
-            <div class="wpqr-helpbox wpqr-helpbox-inline wpqr-helpbox-static">
-                <h3 class="wpqr-helpbox-title">Aide pour le mode Lien web</h3>
-                <div class="wpqr-helpbox-content">
-                    <p>Collez ici l’URL complète d’un site, d’un formulaire, d’un PDF ou d’une page d’inscription.</p>
-                </div>
-            </div>
-        </div>
+            <p class="wpqr-field-note">URL complète d’un site, d’un formulaire, d’un PDF ou d’une page d’inscription.</p>
         <?php
+        $this->panel_close();
     }
 
-    private function render_panel_wifi(): void {
+    private function render_panel_wifi(string $instance_id): void {
+        $this->panel_open($instance_id, 'wifi');
         ?>
-        <div class="wpqr-panel" data-panel="wifi">
             <label>
                 <span>Nom du réseau (SSID)</span>
-                <input type="text" name="wifi_ssid" placeholder="Mon réseau Wi-Fi">
+                <input type="text" name="wifi_ssid" autocomplete="off" placeholder="Mon réseau Wi-Fi">
             </label>
             <label>
                 <span>Mot de passe</span>
-                <input type="text" name="wifi_password" placeholder="Mot de passe Wi-Fi">
+                <input type="text" name="wifi_password" autocomplete="off" spellcheck="false" placeholder="Mot de passe Wi-Fi">
             </label>
             <label>
                 <span>Sécurité</span>
@@ -383,39 +394,29 @@ final class WPQR_Plugin {
                 <input type="checkbox" name="wifi_hidden" value="1">
                 <span>Réseau masqué</span>
             </label>
-            <div class="wpqr-helpbox wpqr-helpbox-inline wpqr-helpbox-static">
-                <h3 class="wpqr-helpbox-title">Aide pour le mode Wi-Fi</h3>
-                <div class="wpqr-helpbox-content">
-                    <p>Indiquez le nom exact du réseau et le bon type de sécurité. Cochez <strong>Réseau masqué</strong> seulement si le SSID n’est pas diffusé.</p>
-                </div>
-            </div>
-        </div>
+            <p class="wpqr-field-note">Indiquez le nom exact du réseau et le bon type de sécurité.</p>
         <?php
+        $this->panel_close();
     }
 
-    private function render_panel_phone(): void {
+    private function render_panel_phone(string $instance_id): void {
+        $this->panel_open($instance_id, 'phone');
         ?>
-        <div class="wpqr-panel" data-panel="phone">
             <label>
                 <span>Numéro de téléphone</span>
-                <input type="text" name="phone_number" placeholder="+33299000000">
+                <input type="tel" name="phone_number" inputmode="tel" placeholder="+33299000000">
             </label>
-            <div class="wpqr-helpbox wpqr-helpbox-inline wpqr-helpbox-static">
-                <h3 class="wpqr-helpbox-title">Aide pour le mode Téléphone</h3>
-                <div class="wpqr-helpbox-content">
-                    <p>Le scan proposera directement de lancer un appel. Utilisez de préférence un numéro au format international.</p>
-                </div>
-            </div>
-        </div>
+            <p class="wpqr-field-note">Le scan proposera de lancer un appel. Le format international est recommandé.</p>
         <?php
+        $this->panel_close();
     }
 
-    private function render_panel_email(): void {
+    private function render_panel_email(string $instance_id): void {
+        $this->panel_open($instance_id, 'email');
         ?>
-        <div class="wpqr-panel" data-panel="email">
             <label>
                 <span>Adresse e-mail</span>
-                <input type="email" name="email_to" placeholder="contact@exemple.org">
+                <input type="email" name="email_to" inputmode="email" placeholder="contact@exemple.org">
             </label>
             <label>
                 <span>Sujet</span>
@@ -425,67 +426,96 @@ final class WPQR_Plugin {
                 <span>Message</span>
                 <textarea name="email_body" rows="3" placeholder="Bonjour,"></textarea>
             </label>
-            <div class="wpqr-helpbox wpqr-helpbox-inline wpqr-helpbox-static">
-                <h3 class="wpqr-helpbox-title">Aide pour le mode E-mail</h3>
-                <div class="wpqr-helpbox-content">
-                    <p>Le scan ouvrira un nouveau mail prérempli avec le destinataire, le sujet et éventuellement le message.</p>
-                </div>
-            </div>
-        </div>
+            <p class="wpqr-field-note">Le scan ouvrira un nouveau message prérempli.</p>
         <?php
+        $this->panel_close();
     }
 
-    private function render_panel_sms(): void {
+    private function render_panel_sms(string $instance_id): void {
+        $this->panel_open($instance_id, 'sms');
         ?>
-        <div class="wpqr-panel" data-panel="sms">
             <label>
                 <span>Numéro</span>
-                <input type="text" name="sms_number" placeholder="+33600000000">
+                <input type="tel" name="sms_number" inputmode="tel" placeholder="+33600000000">
             </label>
             <label>
                 <span>Message</span>
                 <textarea name="sms_body" rows="3" placeholder="Bonjour, je souhaite avoir un renseignement."></textarea>
             </label>
-            <div class="wpqr-helpbox wpqr-helpbox-inline wpqr-helpbox-static">
-                <h3 class="wpqr-helpbox-title">Aide pour le mode SMS</h3>
-                <div class="wpqr-helpbox-content">
-                    <p>Le scan ouvrira l’application de SMS avec le numéro et le message préremplis.</p>
-                </div>
-            </div>
-        </div>
+            <p class="wpqr-field-note">Le scan ouvrira l’application de SMS avec le numéro et le message préremplis.</p>
         <?php
+        $this->panel_close();
     }
 
-    private function render_panel_gps(): void {
+    private function render_panel_gps(string $instance_id): void {
+        $this->panel_open($instance_id, 'gps');
         ?>
-        <div class="wpqr-panel" data-panel="gps">
             <div class="wpqr-grid wpqr-grid--two">
                 <label>
                     <span>Latitude</span>
-                    <input type="text" name="gps_lat" placeholder="48.101">
+                    <input type="text" name="gps_lat" inputmode="decimal" placeholder="48.101">
                 </label>
                 <label>
                     <span>Longitude</span>
-                    <input type="text" name="gps_lng" placeholder="-1.674">
+                    <input type="text" name="gps_lng" inputmode="decimal" placeholder="-1.674">
                 </label>
             </div>
             <label>
                 <span>Nom du lieu (facultatif)</span>
                 <input type="text" name="gps_label" placeholder="Mon lieu">
             </label>
-            <div class="wpqr-helpbox wpqr-helpbox-inline wpqr-helpbox-static">
-                <h3 class="wpqr-helpbox-title">Aide pour le mode GPS</h3>
-                <div class="wpqr-helpbox-content">
-                    <p>Le scan ouvrira généralement l’application de cartographie avec le point géographique indiqué.</p>
-                </div>
-            </div>
-        </div>
+            <p class="wpqr-field-note">Le scan ouvrira généralement une application de cartographie compatible.</p>
         <?php
+        $this->panel_close();
     }
 
-    private function render_panel_contact(): void {
+    private function render_panel_event(string $instance_id): void {
+        $this->panel_open($instance_id, 'event');
         ?>
-        <div class="wpqr-panel" data-panel="contact">
+            <label>
+                <span>Titre de l’événement</span>
+                <input type="text" name="event_title" placeholder="Réunion d’équipe">
+            </label>
+            <label class="wpqr-inline">
+                <input type="checkbox" name="event_all_day" value="1">
+                <span>Journée entière</span>
+            </label>
+            <div class="wpqr-grid wpqr-grid--two">
+                <label>
+                    <span>Date de début</span>
+                    <input type="date" name="event_start_date">
+                </label>
+                <label class="wpqr-event-time-field">
+                    <span>Heure de début</span>
+                    <input type="time" name="event_start_time">
+                </label>
+            </div>
+            <div class="wpqr-grid wpqr-grid--two">
+                <label>
+                    <span>Date de fin (facultative)</span>
+                    <input type="date" name="event_end_date">
+                </label>
+                <label class="wpqr-event-time-field">
+                    <span>Heure de fin (facultative)</span>
+                    <input type="time" name="event_end_time">
+                </label>
+            </div>
+            <label>
+                <span>Lieu (facultatif)</span>
+                <input type="text" name="event_location" placeholder="Salle polyvalente">
+            </label>
+            <label>
+                <span>Description (facultative)</span>
+                <textarea name="event_description" rows="3" placeholder="Ordre du jour, consignes ou informations utiles"></textarea>
+            </label>
+            <p class="wpqr-field-note">Le QR code contient un événement iCalendar. Si aucune fin n’est indiquée, une durée d’une heure est utilisée, ou une journée complète pour un événement sur la journée.</p>
+        <?php
+        $this->panel_close();
+    }
+
+    private function render_panel_contact(string $instance_id): void {
+        $this->panel_open($instance_id, 'contact');
+        ?>
             <div class="wpqr-grid wpqr-grid--two">
                 <label>
                     <span>Nom</span>
@@ -499,16 +529,16 @@ final class WPQR_Plugin {
             <div class="wpqr-grid wpqr-grid--two">
                 <label>
                     <span>Téléphone</span>
-                    <input type="text" name="contact_phone" placeholder="+33299000000">
+                    <input type="tel" name="contact_phone" inputmode="tel" placeholder="+33299000000">
                 </label>
                 <label>
                     <span>E-mail</span>
-                    <input type="email" name="contact_email" placeholder="contact@exemple.org">
+                    <input type="email" name="contact_email" inputmode="email" placeholder="contact@exemple.org">
                 </label>
             </div>
             <label>
                 <span>Site web</span>
-                <input type="url" name="contact_url" placeholder="https://exemple.org/">
+                <input type="url" name="contact_url" inputmode="url" placeholder="https://exemple.org/">
             </label>
             <label>
                 <span>Adresse</span>
@@ -518,20 +548,15 @@ final class WPQR_Plugin {
                 <span>Note</span>
                 <textarea name="contact_note" rows="3" placeholder="Informations complémentaires"></textarea>
             </label>
-            <div class="wpqr-helpbox wpqr-helpbox-inline wpqr-helpbox-static">
-                <h3 class="wpqr-helpbox-title">Aide pour le mode Contact</h3>
-                <div class="wpqr-helpbox-content">
-                    <p>Ce mode génère une fiche contact de type vCard pour enregistrer rapidement une personne ou une structure dans le téléphone.</p>
-                </div>
-            </div>
-        </div>
+            <p class="wpqr-field-note">Ce mode génère une fiche vCard enregistrable dans les contacts du téléphone.</p>
         <?php
+        $this->panel_close();
     }
 
     public function render_shortcode($atts = []): string {
         $options = $this->get_options();
-        $headerLogoUrl = $this->resolve_image_url($options, 'header_logo_id');
-        $centerLogoUrl = $this->resolve_image_url($options, 'center_image_id');
+        $header_logo_url = $this->resolve_image_url($options, 'header_logo_id');
+        $center_logo_url = $this->resolve_image_url($options, 'center_image_id');
 
         $atts = shortcode_atts([
             'show_header' => '1',
@@ -548,9 +573,22 @@ final class WPQR_Plugin {
             'light' => $options['qr_light'],
             'size' => $options['default_size'],
             'margin' => $options['default_margin'],
-            'logoEnabled' => $atts['logo'] === '1' && $centerLogoUrl !== '',
-            'centerImageUrl' => $centerLogoUrl,
-            'centerImageSizeRatio' => $options['center_image_size_ratio'],
+            'logoEnabled' => $atts['logo'] === '1' && $center_logo_url !== '',
+            'centerImageUrl' => $center_logo_url,
+            'centerImageSizeRatio' => min((float) $options['center_image_size_ratio'], self::MAX_LOGO_RATIO),
+            'maxLogoRatio' => self::MAX_LOGO_RATIO,
+        ];
+
+        $tabs = [
+            'text' => 'Texte',
+            'url' => 'Lien web',
+            'wifi' => 'Wi-Fi',
+            'phone' => 'Téléphone',
+            'email' => 'E-mail',
+            'sms' => 'SMS',
+            'gps' => 'GPS',
+            'event' => 'Événement',
+            'contact' => 'Contact',
         ];
 
         ob_start();
@@ -562,10 +600,10 @@ final class WPQR_Plugin {
             data-mode="text"
         >
             <?php if ($atts['show_header'] === '1') : ?>
-                <header class="wpqr-header <?php echo $headerLogoUrl ? '' : 'is-text-only'; ?>">
-                    <?php if ($headerLogoUrl) : ?>
+                <header class="wpqr-header <?php echo $header_logo_url ? '' : 'is-text-only'; ?>">
+                    <?php if ($header_logo_url) : ?>
                         <a class="wpqr-brand" href="<?php echo esc_url($options['header_link_url']); ?>" target="_blank" rel="noopener noreferrer">
-                            <img src="<?php echo esc_url($headerLogoUrl); ?>" alt="">
+                            <img src="<?php echo esc_url($header_logo_url); ?>" alt="<?php echo esc_attr($options['header_title']); ?>">
                         </a>
                     <?php endif; ?>
                     <div class="wpqr-header-text">
@@ -576,28 +614,35 @@ final class WPQR_Plugin {
             <?php endif; ?>
 
             <div class="wpqr-tabs" role="tablist" aria-label="Type de QR code">
-                <button type="button" class="wpqr-tab is-active" data-tab="text">Texte</button>
-                <button type="button" class="wpqr-tab" data-tab="url">Lien web</button>
-                <button type="button" class="wpqr-tab" data-tab="wifi">Wi-Fi</button>
-                <button type="button" class="wpqr-tab" data-tab="phone">Téléphone</button>
-                <button type="button" class="wpqr-tab" data-tab="email">E-mail</button>
-                <button type="button" class="wpqr-tab" data-tab="sms">SMS</button>
-                <button type="button" class="wpqr-tab" data-tab="gps">GPS</button>
-                <button type="button" class="wpqr-tab" data-tab="contact">Contact</button>
+                <?php foreach ($tabs as $mode => $label) :
+                    $active = $mode === 'text';
+                    ?>
+                    <button
+                        id="<?php echo esc_attr($instance_id . '-tab-' . $mode); ?>"
+                        type="button"
+                        class="wpqr-tab<?php echo $active ? ' is-active' : ''; ?>"
+                        data-tab="<?php echo esc_attr($mode); ?>"
+                        role="tab"
+                        aria-selected="<?php echo $active ? 'true' : 'false'; ?>"
+                        aria-controls="<?php echo esc_attr($instance_id . '-panel-' . $mode); ?>"
+                        tabindex="<?php echo $active ? '0' : '-1'; ?>"
+                    ><?php echo esc_html($label); ?></button>
+                <?php endforeach; ?>
             </div>
 
             <?php $this->render_help_intro(); ?>
 
             <form class="wpqr-form" novalidate>
                 <?php
-                $this->render_panel_text();
-                $this->render_panel_url();
-                $this->render_panel_wifi();
-                $this->render_panel_phone();
-                $this->render_panel_email();
-                $this->render_panel_sms();
-                $this->render_panel_gps();
-                $this->render_panel_contact();
+                $this->render_panel_text($instance_id);
+                $this->render_panel_url($instance_id);
+                $this->render_panel_wifi($instance_id);
+                $this->render_panel_phone($instance_id);
+                $this->render_panel_email($instance_id);
+                $this->render_panel_sms($instance_id);
+                $this->render_panel_gps($instance_id);
+                $this->render_panel_event($instance_id);
+                $this->render_panel_contact($instance_id);
                 ?>
 
                 <div class="wpqr-grid">
@@ -607,31 +652,20 @@ final class WPQR_Plugin {
                         <small class="wpqr-field-note">Augmentez-la pour une impression ou un affichage à distance.</small>
                     </label>
                     <label>
-                        <span>Marge</span>
+                        <span>Marge minimale</span>
                         <input type="number" name="margin" min="0" max="80" step="1" value="<?php echo esc_attr($options['default_margin']); ?>">
-                        <small class="wpqr-field-note">Laissez une bordure claire autour du QR pour améliorer la lecture.</small>
+                        <small class="wpqr-field-note">Une zone calme d’au moins quatre modules est ajoutée automatiquement.</small>
                     </label>
                     <label>
                         <span>Correction d’erreur</span>
-                        <select name="ecLevel">
+                        <select name="ecLevel" <?php echo $data['logoEnabled'] ? 'disabled' : ''; ?>>
                             <option value="L">L - 7%</option>
                             <option value="M" <?php selected($data['logoEnabled'], false); ?>>M - 15%</option>
                             <option value="Q">Q - 25%</option>
                             <option value="H" <?php selected($data['logoEnabled'], true); ?>>H - 30%</option>
                         </select>
-                        <small class="wpqr-field-note">Avec un logo central, le niveau <strong>H</strong> est recommandé.</small>
+                        <small class="wpqr-field-note"><?php echo $data['logoEnabled'] ? '<strong>H est imposé automatiquement car un logo central est actif.</strong>' : 'Augmentez ce niveau si le QR risque d’être partiellement masqué ou dégradé.'; ?></small>
                     </label>
-                </div>
-
-                <div class="wpqr-helpbox wpqr-helpbox-inline wpqr-helpbox-static">
-                    <h3 class="wpqr-helpbox-title">Conseils de paramétrage</h3>
-                    <div class="wpqr-helpbox-content">
-                        <ul>
-                            <li><strong>Taille</strong> : 300 à 400 px conviennent bien pour un usage écran ; augmentez pour l’impression.</li>
-                            <li><strong>Marge</strong> : gardez une zone blanche autour du code, surtout si le fond de la page est coloré.</li>
-                            <li><strong>Correction d’erreur</strong> : plus elle est élevée, plus le QR tolère les petits défauts ou la présence du logo.</li>
-                        </ul>
-                    </div>
                 </div>
 
                 <div class="wpqr-actions">
@@ -639,19 +673,22 @@ final class WPQR_Plugin {
                     <button type="button" class="wpqr-button is-secondary" data-action="reset">Réinitialiser</button>
                 </div>
 
+                <p class="wpqr-status" data-role="status" role="status" aria-live="polite" tabindex="-1"></p>
                 <p class="wpqr-help">Le QR code est généré localement dans le navigateur, sans service externe.</p>
                 <div class="wpqr-privacy" role="note" aria-label="Confidentialité">
                     <strong>Confidentialité :</strong> les contenus saisis dans ce formulaire ne sont pas enregistrés sur le site. Ils servent uniquement à générer le QR code dans votre navigateur.
                 </div>
             </form>
 
-            <section class="wpqr-output" hidden>
+            <section class="wpqr-output" hidden tabindex="-1" aria-label="Résultat de la génération">
+                <h3 class="wpqr-sr-only">QR code généré</h3>
                 <div class="wpqr-output-frame">
-                    <canvas class="wpqr-canvas" width="320" height="320"></canvas>
+                    <canvas class="wpqr-canvas" width="320" height="320" role="img" aria-label="QR code généré"></canvas>
                 </div>
 
                 <div class="wpqr-links">
-                    <a class="wpqr-button" data-role="download" href="#" download="qr-code.png">Télécharger le QR</a>
+                    <a class="wpqr-button" data-role="download" href="#" download="qr-code.png">Télécharger en PNG</a>
+                    <a class="wpqr-button" data-role="download-svg" href="#" download="qr-code.svg">Télécharger en SVG</a>
                     <a class="wpqr-button is-secondary" data-role="open" href="#" target="_blank" rel="noopener noreferrer">Ouvrir l’image</a>
                 </div>
 
@@ -665,8 +702,8 @@ final class WPQR_Plugin {
                     <div class="wpqr-helpbox-content">
                         <ul>
                             <li>Testez le QR sur plusieurs smartphones avant diffusion ou impression.</li>
-                            <li>Si le scan est difficile, augmentez la taille, la marge, ou réduisez l’importance du logo central.</li>
-                            <li>Pour le Wi-Fi, vérifiez l’orthographe du SSID et le type de sécurité choisi.</li>
+                            <li>Préférez le SVG pour une affiche, un grand format ou un document destiné à l’impression.</li>
+                            <li>Si le scan est difficile, augmentez la taille ou simplifiez le contenu.</li>
                         </ul>
                     </div>
                 </div>

@@ -20,21 +20,29 @@ Aucune donnée saisie n’est enregistrée par le plugin ni transmise à un serv
 - e-mails avec destinataire, objet et message ;
 - SMS préremplis ;
 - coordonnées GPS ;
+- événements au format iCalendar ;
 - fiches de contact au format vCard ;
-- téléchargement des QR codes au format PNG ;
+- téléchargement au format PNG ;
+- export vectoriel au format SVG ;
 - génération locale dans le navigateur ;
+- prise en charge UTF-8 ;
 - interface responsive ;
-- consignes d’utilisation intégrées ;
+- navigation accessible au clavier ;
+- messages d’erreur et de confirmation accessibles ;
 - logo d’en-tête facultatif ;
 - logo facultatif au centre du QR code ;
 - sélection des logos depuis la médiathèque WordPress ;
-- personnalisation des couleurs, de la taille et des marges ;
-- aucun service externe nécessaire ;
-- aucune donnée utilisateur enregistrée.
+- correction d’erreur H automatique avec un logo central ;
+- limitation automatique de la taille du logo ;
+- zone calme minimale de quatre modules ;
+- aucune donnée utilisateur enregistrée ;
+- aucun service externe nécessaire.
 
 ## Exemple
 
-    [wpqr]
+```text
+[wpqr]
+```
 
 Ajoutez simplement ce shortcode dans une page ou un article WordPress pour afficher le générateur complet.
 
@@ -70,9 +78,37 @@ Prépare un SMS à destination du numéro indiqué.
 
 Ouvre des coordonnées géographiques dans une application cartographique compatible.
 
+### Événement
+
+Crée un événement iCalendar avec titre, date, horaires, lieu et description.
+
 ### Contact
 
 Crée une fiche de contact au format vCard pouvant contenir un nom, une organisation, un téléphone, une adresse e-mail et une adresse postale.
+
+## Installation
+
+1. Téléchargez l’archive ZIP de la dernière version.
+2. Dans WordPress, ouvrez **Extensions > Ajouter une extension**.
+3. Cliquez sur **Téléverser une extension**.
+4. Sélectionnez l’archive ZIP.
+5. Installez puis activez le plugin.
+6. Ouvrez **Réglages > WP QR Code Generator**.
+7. Ajoutez le shortcode `[wpqr]` dans une page ou un article.
+
+## Personnalisation
+
+Depuis les réglages WordPress, il est possible de configurer :
+
+- le titre et le sous-titre ;
+- le lien d’en-tête ;
+- le logo d’en-tête ;
+- le logo central ;
+- la taille du logo central ;
+- les couleurs du QR code ;
+- la taille et la marge par défaut.
+
+Aucun logo n’est imposé ou fourni par défaut.
 
 ## Confidentialité
 
@@ -85,14 +121,6 @@ Les informations saisies ne sont :
 - ni envoyées à un service externe de génération de QR codes.
 
 Seuls les réglages généraux du plugin sont enregistrés dans WordPress.
-
-## Documentation
-
-Les principales consignes d’utilisation sont affichées directement dans l’interface du générateur.
-
-Le plugin se configure depuis :
-
-    Réglages > WP QR Code Generator
 
 ## Bibliothèque utilisée
 
