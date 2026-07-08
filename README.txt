@@ -1,34 +1,51 @@
-WP QR Code Generator – version 1.0
+# WP QR Code Generator
 
-Générateur autonome de QR codes pour WordPress.
+Plugin WordPress permettant d’intégrer un générateur de QR codes simple, personnalisable et respectueux de la confidentialité.
 
-Fonctionnalités :
-- QR texte ;
-- lien web ;
-- Wi-Fi ;
-- téléphone ;
-- e-mail ;
-- SMS ;
+Les QR codes sont générés localement dans le navigateur, sans transmettre les informations saisies à un service externe.
+
+## Objectif
+
+WP QR Code Generator permet aux visiteurs autorisés à créer facilement différents types de QR codes depuis une page WordPress.
+
+WordPress fournit l’interface. Le navigateur génère le QR code.
+
+Aucune connaissance des formats techniques utilisés par les QR codes n’est nécessaire : l’utilisateur choisit simplement le type de contenu et complète les champs proposés.
+
+## Fonctionnalités
+
+- shortcode unique `[wpqr]` ;
+- génération de QR codes contenant du texte ;
+- liens vers des sites web ;
+- informations de connexion Wi-Fi ;
+- numéros de téléphone ;
+- e-mails avec destinataire, objet et message ;
+- SMS préremplis ;
 - coordonnées GPS ;
-- fiche contact vCard ;
-- génération locale dans le navigateur, sans service externe ;
-- logo d’en-tête optionnel choisi dans la médiathèque WordPress ;
-- logo central optionnel choisi dans la médiathèque WordPress ;
-- couleurs, taille et marge configurables.
+- fiches de contact au format vCard ;
+- téléchargement du QR code généré ;
+- interface responsive adaptée aux ordinateurs, tablettes et téléphones ;
+- consignes d’utilisation directement affichées sous les champs ;
+- logo d’en-tête facultatif ;
+- logo facultatif au centre du QR code ;
+- sélection des logos depuis la médiathèque WordPress ;
+- réglage de la taille et de l’apparence du QR code ;
+- génération locale dans le navigateur ;
+- aucun service externe de génération de QR code ;
+- aucune information saisie enregistrée par le plugin.
 
-Installation :
-1. Téléversez le dossier du plugin dans wp-content/plugins/ ou installez le ZIP depuis WordPress.
-2. Activez l’extension.
-3. Ouvrez Réglages > WP QR Code Generator.
-4. Configurez l’apparence et les logos si nécessaire.
-5. Insérez le shortcode [wpqr] dans une page.
+## Installation
 
-Confidentialité :
-- les contenus saisis par les visiteurs ne sont pas enregistrés dans WordPress ;
-- les QR codes sont générés localement dans le navigateur ;
-- aucun contenu n’est envoyé à un service tiers.
+1. Téléchargez l’archive du plugin.
+2. Dans WordPress, ouvrez **Extensions > Ajouter une extension**.
+3. Cliquez sur **Téléverser une extension**.
+4. Sélectionnez l’archive ZIP.
+5. Installez puis activez le plugin.
+6. Ouvrez **Réglages > WP QR Code Generator** pour le paramétrer.
 
-Remarques :
-- aucun logo n’est fourni par défaut ;
-- le logo central reste optionnel ;
-- pour préserver la lecture, évitez un logo central trop grand et utilisez la correction d’erreur H.
+## Utilisation
+
+Ajoutez le shortcode suivant dans une page ou un article WordPress :
+
+```text
+[wpqr]
