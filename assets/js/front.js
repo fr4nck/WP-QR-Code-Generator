@@ -40,6 +40,14 @@
     return 'https://' + raw;
   }
 
+  function buildContentUrl(root) {
+    const selectedId = qs(root, '[name="content_id"]').value.trim();
+    if (!selectedId || !/^[1-9][0-9]*$/.test(selectedId)) return '';
+    const config = root.wpqrConfig || {};
+    const selectedUrl = qs(root, '[name="content_id"]').dataset.url || '';
+    return selectedUrl || (config.siteUrl || window.location.origin).replace(/\/+$/, '') + '/qr/' + selectedId + '/';
+  }
+
   function buildMailto(root) {
     const to = qs(root, '[name="email_to"]').value.trim();
     const subject = qs(root, '[name="email_subject"]').value.trim();
@@ -244,6 +252,11 @@
     if (mode === 'url') {
       const payload = normalizeUrl(qs(root, '[name="url_value"]').value);
       return { payload, error: payload ? '' : 'Renseignez une adresse web.' };
+    }
+
+    if (mode === 'content') {
+      const payload = buildContentUrl(root);
+      return { payload, error: payload ? '' : 'Recherchez puis sélectionnez un contenu WordPress publié.' };
     }
 
     if (mode === 'phone') {
@@ -661,6 +674,83 @@
     }
   }
 
+  function renderContentResults(root, items) {
+    const results = qs(root, '[data-role="content-results"]');
+    results.innerHTML = '';
+
+    if (!items.length) {
+      results.hidden = false;
+      results.innerHTML = '<p class="wpqr-field-note">Aucun contenu publié trouvé.</p>';
+      return;
+    }
+
+    const list = document.createElement('div');
+    list.className = 'wpqr-content-result-list';
+    items.forEach((item) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'wpqr-content-result';
+      button.dataset.id = String(item.id || '');
+      button.dataset.url = String(item.url || '');
+      button.textContent = (item.title || 'Sans titre') + ' — ' + (item.type || 'Contenu') + ' (#' + item.id + ')';
+      list.appendChild(button);
+    });
+
+    results.appendChild(list);
+    results.hidden = false;
+  }
+
+  function configureContentSearch(root, config) {
+    const search = qs(root, '[data-role="content-search"]');
+    const contentId = qs(root, '[name="content_id"]');
+    const results = qs(root, '[data-role="content-results"]');
+    if (!search || !contentId || !results || !config.ajaxUrl) return;
+
+    let controller = null;
+    let timer = null;
+
+    search.addEventListener('input', function () {
+      contentId.value = '';
+      contentId.dataset.url = '';
+      clearTimeout(timer);
+
+      const term = search.value.trim();
+      if (term.length < 2) {
+        results.hidden = true;
+        results.innerHTML = '';
+        return;
+      }
+
+      timer = setTimeout(function () {
+        if (controller) controller.abort();
+        controller = new AbortController();
+        const url = new URL(config.ajaxUrl);
+        url.searchParams.set('action', 'wpqr_search_content');
+        url.searchParams.set('term', term);
+
+        fetch(url.toString(), { credentials: 'same-origin', signal: controller.signal })
+          .then((response) => response.json())
+          .then((json) => renderContentResults(root, Array.isArray(json.data) ? json.data : []))
+          .catch((error) => {
+            if (error.name === 'AbortError') return;
+            console.warn(error);
+            results.hidden = false;
+            results.innerHTML = '<p class="wpqr-field-note">La recherche est momentanément indisponible.</p>';
+          });
+      }, 250);
+    });
+
+    results.addEventListener('click', function (event) {
+      const button = event.target.closest('.wpqr-content-result');
+      if (!button) return;
+      contentId.value = button.dataset.id || '';
+      contentId.dataset.url = button.dataset.url || '';
+      search.value = button.textContent;
+      results.hidden = true;
+      setStatus(root, 'Contenu sélectionné. Le QR pointera vers ' + contentId.dataset.url, 'success');
+    });
+  }
+
   function clearCanvas(canvas) {
     const ctx = canvas.getContext('2d');
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -674,10 +764,12 @@
     } catch (error) {
       console.warn(error);
     }
+    root.wpqrConfig = config;
 
     activateTab(root, root.dataset.mode || 'text', false);
     configureKeyboardTabs(root);
     syncEventAllDay(root);
+    configureContentSearch(root, config);
 
     qsa(root, '.wpqr-tab').forEach((tab) => {
       tab.addEventListener('click', () => changeMode(root, tab.dataset.tab, false));

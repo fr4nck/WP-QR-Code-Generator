@@ -1,5 +1,16 @@
 # Journal des modifications
 
+## 1.3.0
+
+- ajout du mode public « Contenu WordPress » dans le shortcode `[wpqr]` ;
+- ajout d’une recherche par autocomplétion sur les articles, pages et types de contenus personnalisés publics publiés, hors pièces jointes ;
+- génération locale d’une URL stable `/qr/{ID}/` basée sur l’identifiant natif WordPress ;
+- ajout de la règle de réécriture `/qr/{ID}/` et d’une redirection HTTP 302 vers le permalien actuel ;
+- ajout d’une page `noindex` « QR code indisponible » lorsque le contenu n’est plus accessible publiquement ;
+- ajout d’un réglage permettant de choisir une page WordPress publiée comme page de contact, sans saisie directe d’e-mail ou de téléphone ;
+- conservation du principe sans CPT, sans table, sans historique et sans objet QR stocké.
+
+
 ## 1.2.0
 
 - ajout d’une section « Coordonnées de l’organisme » dans les réglages WordPress ;

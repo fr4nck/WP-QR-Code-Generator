@@ -2,7 +2,7 @@
 Contributors: fr4nck
 Tags: qr-code, generator, wifi, vcard, event, privacy
 Requires at least: 6.0
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -13,11 +13,11 @@ Générateur autonome de QR codes pour WordPress, sans stockage des contenus ni 
 
 WP QR Code Generator permet d’intégrer un générateur complet dans une page WordPress avec le shortcode [wpqr].
 
-Types pris en charge : texte, lien web, Wi-Fi, téléphone, e-mail, SMS, GPS, événement iCalendar et contact vCard.
+Types pris en charge : texte, lien web, contenu WordPress, Wi-Fi, téléphone, e-mail, SMS, GPS, événement iCalendar et contact vCard.
 
 Les coordonnées générales d’un organisme peuvent être enregistrées dans les réglages afin de préremplir facultativement les fiches de contact. Les données propres à chaque personne ne sont pas conservées.
 
-Les QR codes sont générés localement dans le navigateur et peuvent être téléchargés en PNG ou SVG.
+Les QR codes sont générés localement dans le navigateur et peuvent être téléchargés en PNG ou SVG. Le mode Contenu WordPress encode une URL stable /qr/{ID}/ qui redirige en HTTP 302 vers le permalien actuel du contenu publié sélectionné.
 
 == Installation ==
 
@@ -29,9 +29,17 @@ Les QR codes sont générés localement dans le navigateur et peuvent être tél
 
 == Confidentialité ==
 
-Les contenus saisis ne sont pas enregistrés dans WordPress et ne sont pas transmis à un service externe.
+Les contenus saisis ne sont pas enregistrés dans WordPress et ne sont pas transmis à un service externe. Le plugin ne crée aucun CPT, aucune table, aucun historique et aucun objet QR stocké.
 
 == Changelog ==
+
+= 1.3.0 =
+* Ajout du mode « Contenu WordPress » avec recherche par autocomplétion.
+* Encodage local d’URL stables /qr/{ID}/ basées sur les identifiants natifs WordPress.
+* Ajout de la règle de réécriture /qr/{ID}/ avec redirection 302 vers le permalien actuel.
+* Ajout d’une page noindex « QR code indisponible » avec retour à l’accueil et bouton de contact optionnel.
+* Ajout d’un réglage de page de contact publiée sans saisie directe d’e-mail ou de téléphone.
+
 
 = 1.2.0 =
 * Ajout d’une section « Coordonnées de l’organisme » dans les réglages.

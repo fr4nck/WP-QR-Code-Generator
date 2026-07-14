@@ -15,6 +15,7 @@ Aucune donnée saisie n’est enregistrée par le plugin ni transmise à un serv
 - shortcode unique `[wpqr]` ;
 - génération de QR codes contenant du texte ;
 - liens vers des pages web ;
+- QR « Contenu WordPress » avec autocomplétion vers les articles, pages et contenus personnalisés publics publiés ;
 - informations de connexion Wi-Fi ;
 - numéros de téléphone ;
 - e-mails avec destinataire, objet et message ;
@@ -59,6 +60,14 @@ Encode un texte libre, une consigne ou toute autre information.
 ### Lien web
 
 Ouvre directement une adresse web dans le navigateur.
+
+### Contenu WordPress
+
+Recherche un contenu WordPress existant parmi les articles publiés, pages publiées et types de contenus personnalisés publics publiés, en excluant les pièces jointes.
+
+Le QR encode une URL stable `/qr/{ID}/` basée sur l’identifiant natif WordPress. Lorsqu’elle est visitée, cette URL redirige en HTTP 302 vers le permalien actuel du contenu afin de rester valide si le slug ou la structure de permaliens change.
+
+Si le contenu n’existe plus ou n’est plus publiquement accessible, une page « QR code indisponible » est affichée avec une référence de signalement, un bouton de retour à l’accueil et, si elle est configurée, un bouton vers la page de contact. Cette page est marquée `noindex` et n’affiche jamais directement d’e-mail ni de téléphone.
 
 ### Wi-Fi
 
@@ -111,7 +120,8 @@ Depuis les réglages WordPress, il est possible de configurer :
 - la taille du logo central ;
 - les couleurs du QR code ;
 - la taille et la marge par défaut ;
-- les coordonnées générales de l’organisme utilisées pour préremplir les vCards.
+- les coordonnées générales de l’organisme utilisées pour préremplir les vCards ;
+- une page WordPress publiée utilisée comme contact pour les QR indisponibles.
 
 Aucun logo n’est imposé ou fourni par défaut.
 
@@ -125,7 +135,7 @@ Les informations saisies ne sont :
 - ni conservées dans un historique ;
 - ni envoyées à un service externe de génération de QR codes.
 
-Seuls les réglages généraux du plugin et les coordonnées de l’organisme saisies volontairement par un administrateur sont enregistrés dans WordPress.
+Seuls les réglages généraux du plugin, la page de contact choisie et les coordonnées de l’organisme saisies volontairement par un administrateur sont enregistrés dans WordPress. Le mode Contenu WordPress ne crée aucun type de contenu, aucune table, aucun historique et aucun objet QR stocké.
 
 ## Bibliothèque utilisée
 

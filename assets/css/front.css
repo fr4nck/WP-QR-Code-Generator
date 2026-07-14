@@ -440,3 +440,37 @@
     animation: none !important;
   }
 }
+
+.wpqr-content-results {
+  margin-top: 0.5rem;
+  border: 1px solid var(--wpqr-border);
+  border-radius: 10px;
+  background: var(--wpqr-surface);
+  overflow: hidden;
+}
+
+.wpqr-content-result-list {
+  display: grid;
+  gap: 0;
+}
+
+.wpqr-content-result {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--wpqr-border);
+  padding: 0.75rem 1rem;
+  background: transparent;
+  color: var(--wpqr-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpqr-content-result:last-child {
+  border-bottom: 0;
+}
+
+.wpqr-content-result:hover,
+.wpqr-content-result:focus-visible {
+  background: var(--wpqr-surface-soft);
+  outline: none;
+}
