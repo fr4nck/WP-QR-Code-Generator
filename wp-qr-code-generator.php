@@ -3,7 +3,7 @@
  * Plugin Name: WP QR Code Generator
  * Plugin URI: https://github.com/fr4nck/Wp-Qr-code-Generator
  * Description: Générateur autonome de QR codes avec export PNG/SVG, logos optionnels et préremplissage vCard depuis les coordonnées d’un organisme.
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: Franck Bellardie
  * License: GPL-2.0-or-later
  * Text Domain: wp-qr-code-generator
@@ -17,8 +17,9 @@ if (!defined('ABSPATH')) {
 
 final class WPQR_Plugin {
     private const OPTION_KEY = 'wpqr_options';
-    private const VERSION = '1.2.0';
+    private const VERSION = '1.3.0';
     private const MAX_LOGO_RATIO = 0.22;
+    private const QUERY_VAR = 'wpqr_content_id';
 
     public function __construct() {
         add_action('admin_menu', [$this, 'register_admin_menu']);
@@ -26,6 +27,11 @@ final class WPQR_Plugin {
         add_action('wp_enqueue_scripts', [$this, 'register_front_assets']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
         add_shortcode('wpqr', [$this, 'render_shortcode']);
+        add_action('init', [$this, 'add_rewrite_rules']);
+        add_filter('query_vars', [$this, 'register_query_vars']);
+        add_action('template_redirect', [$this, 'handle_qr_redirect']);
+        add_action('wp_ajax_wpqr_search_content', [$this, 'ajax_search_content']);
+        add_action('wp_ajax_nopriv_wpqr_search_content', [$this, 'ajax_search_content']);
     }
 
     public function register_front_assets(): void {
@@ -169,6 +175,25 @@ final class WPQR_Plugin {
                 ]
             );
         }
+
+
+        add_settings_section(
+            'wpqr_unavailable_section',
+            'Gestion des QR indisponibles',
+            function () {
+                echo '<p>Choisissez uniquement une page WordPress publiée vers laquelle orienter les visiteurs si le contenu associé à un QR n’est plus disponible. Aucune adresse e-mail ni aucun numéro de téléphone n’est saisi ici.</p>';
+            },
+            'wp-qr-code-generator'
+        );
+
+        add_settings_field(
+            'wpqr_contact_page_id',
+            'Page de contact',
+            [$this, 'render_field'],
+            'wp-qr-code-generator',
+            'wpqr_unavailable_section',
+            ['key' => 'contact_page_id']
+        );
     }
 
     public function sanitize_options($input): array {
@@ -210,8 +235,139 @@ final class WPQR_Plugin {
         $output['org_phone'] = sanitize_text_field($input['org_phone'] ?? $defaults['org_phone']);
         $output['org_email'] = sanitize_email($input['org_email'] ?? $defaults['org_email']);
         $output['org_website'] = esc_url_raw($input['org_website'] ?? $defaults['org_website']);
+        $output['contact_page_id'] = $this->sanitize_contact_page_id($input['contact_page_id'] ?? 0);
 
         return $output;
+    }
+
+    private function sanitize_contact_page_id($value): int {
+        $page_id = absint($value);
+        if ($page_id === 0) {
+            return 0;
+        }
+
+        $page = get_post($page_id);
+        if (!$page || $page->post_type !== 'page' || $page->post_status !== 'publish') {
+            return 0;
+        }
+
+        return $page_id;
+    }
+
+    public function add_rewrite_rules(): void {
+        add_rewrite_rule('^qr/([0-9]+)/?$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top');
+    }
+
+    public function register_query_vars(array $vars): array {
+        $vars[] = self::QUERY_VAR;
+        return $vars;
+    }
+
+    public static function activate(): void {
+        self::register_rewrite_rule();
+        flush_rewrite_rules();
+    }
+
+    public static function deactivate(): void {
+        flush_rewrite_rules();
+    }
+
+    private static function register_rewrite_rule(): void {
+        add_rewrite_rule('^qr/([0-9]+)/?$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top');
+    }
+
+    private function get_public_content_post_types(): array {
+        $types = get_post_types(['public' => true], 'names');
+        unset($types['attachment']);
+        return array_values($types);
+    }
+
+    private function is_publicly_accessible_post($post): bool {
+        if (!$post instanceof WP_Post || $post->post_status !== 'publish') {
+            return false;
+        }
+
+        $type = get_post_type_object($post->post_type);
+        return $type && !empty($type->public) && $post->post_type !== 'attachment' && is_post_publicly_viewable($post);
+    }
+
+    public function handle_qr_redirect(): void {
+        $content_id = absint(get_query_var(self::QUERY_VAR));
+        if ($content_id === 0) {
+            return;
+        }
+
+        $post = get_post($content_id);
+        if ($this->is_publicly_accessible_post($post)) {
+            $permalink = get_permalink($post);
+            if ($permalink) {
+                wp_safe_redirect($permalink, 302);
+                exit;
+            }
+        }
+
+        $this->render_unavailable_page($content_id);
+        exit;
+    }
+
+    private function render_unavailable_page(int $content_id): void {
+        status_header(404);
+        nocache_headers();
+        $options = $this->get_options();
+        $contact_page_id = $this->sanitize_contact_page_id($options['contact_page_id'] ?? 0);
+        $contact_url = $contact_page_id ? get_permalink($contact_page_id) : '';
+        ?><!doctype html>
+<html <?php language_attributes(); ?>>
+<head>
+<meta charset="<?php bloginfo('charset'); ?>">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<?php wp_head(); ?>
+</head>
+<body <?php body_class('wpqr-unavailable-page'); ?>>
+<main class="wpqr-unavailable" style="max-width:720px;margin:8vh auto;padding:2rem;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.5;">
+    <h1>QR code indisponible</h1>
+    <p>Le contenu associé à ce QR code n’est plus disponible ou n’est pas accessible publiquement.</p>
+    <p>Référence du QR&nbsp;: <strong><?php echo esc_html((string) $content_id); ?></strong></p>
+    <p>
+        <a href="<?php echo esc_url(home_url('/')); ?>" style="display:inline-block;margin:.25rem .5rem .25rem 0;padding:.75rem 1rem;background:#1f4b7a;color:#fff;text-decoration:none;border-radius:4px;">Retour à l’accueil</a>
+        <?php if ($contact_url) : ?>
+            <a href="<?php echo esc_url($contact_url); ?>" style="display:inline-block;margin:.25rem 0;padding:.75rem 1rem;border:1px solid #1f4b7a;color:#1f4b7a;text-decoration:none;border-radius:4px;">Contacter l’organisme</a>
+        <?php endif; ?>
+    </p>
+</main>
+<?php wp_footer(); ?>
+</body>
+</html><?php
+    }
+
+    public function ajax_search_content(): void {
+        $term = sanitize_text_field(wp_unslash($_GET['term'] ?? ''));
+        if (strlen($term) < 2) {
+            wp_send_json_success([]);
+        }
+
+        $query = new WP_Query([
+            'post_type' => $this->get_public_content_post_types(),
+            'post_status' => 'publish',
+            's' => $term,
+            'posts_per_page' => 10,
+            'no_found_rows' => true,
+            'ignore_sticky_posts' => true,
+        ]);
+
+        $items = [];
+        foreach ($query->posts as $post) {
+            $type = get_post_type_object($post->post_type);
+            $items[] = [
+                'id' => (int) $post->ID,
+                'title' => html_entity_decode(get_the_title($post), ENT_QUOTES, get_bloginfo('charset')),
+                'type' => $type ? $type->labels->singular_name : $post->post_type,
+                'url' => home_url('/qr/' . (int) $post->ID . '/'),
+            ];
+        }
+
+        wp_send_json_success($items);
     }
 
     private function sanitize_hex_color_or_default(string $value, string $default): string {
@@ -242,6 +398,7 @@ final class WPQR_Plugin {
             'org_phone' => '',
             'org_email' => '',
             'org_website' => '',
+            'contact_page_id' => 0,
         ];
     }
 
@@ -320,6 +477,16 @@ final class WPQR_Plugin {
         }
 
         switch ($key) {
+            case 'contact_page_id':
+                wp_dropdown_pages([
+                    'name' => $name,
+                    'selected' => absint($value),
+                    'show_option_none' => '— Aucune page de contact —',
+                    'option_none_value' => '0',
+                    'post_status' => 'publish',
+                ]);
+                echo '<p class="description">Cette page est liée depuis la page d’indisponibilité, sans afficher d’e-mail ni de téléphone.</p>';
+                break;
             case 'logo_enabled':
                 printf(
                     '<label><input type="checkbox" name="%1$s" value="1" %2$s> Utiliser le logo au centre des nouveaux QR codes</label><p class="description">Le logo ne sera inséré que si une image centrale est choisie ci-dessous. La correction H sera imposée automatiquement.</p>',
@@ -388,7 +555,7 @@ final class WPQR_Plugin {
         <div class="wrap">
             <h1>WP QR Code Generator</h1>
             <p>Shortcode : <code>[wpqr]</code></p>
-            <p>Types disponibles : Texte, Lien web, Wi-Fi, Téléphone, E-mail, SMS, GPS, Événement et Contact.</p>
+            <p>Types disponibles : Texte, Lien web, Contenu WordPress, Wi-Fi, Téléphone, E-mail, SMS, GPS, Événement et Contact.</p>
             <p>Les QR codes sont générés localement dans le navigateur et peuvent être téléchargés en PNG ou SVG.</p>
             <p>Les contenus saisis par les visiteurs ne sont ni enregistrés dans WordPress ni envoyés à un service externe.</p>
             <p>La section <strong>Coordonnées de l’organisme</strong> permet de préremplir facultativement les fiches de contact vCard.</p>
@@ -460,6 +627,20 @@ final class WPQR_Plugin {
                 <input type="url" name="url_value" inputmode="url" placeholder="https://exemple.org/">
             </label>
             <p class="wpqr-field-note">URL complète d’un site, d’un formulaire, d’un PDF ou d’une page d’inscription.</p>
+        <?php
+        $this->panel_close();
+    }
+
+    private function render_panel_content(string $instance_id): void {
+        $this->panel_open($instance_id, 'content');
+        ?>
+            <label>
+                <span>Rechercher un contenu WordPress publié</span>
+                <input type="search" name="content_search" autocomplete="off" placeholder="Saisissez au moins 2 caractères" data-role="content-search" aria-describedby="<?php echo esc_attr($instance_id . '-content-note'); ?>">
+            </label>
+            <input type="hidden" name="content_id" value="">
+            <div class="wpqr-content-results" data-role="content-results" hidden></div>
+            <p id="<?php echo esc_attr($instance_id . '-content-note'); ?>" class="wpqr-field-note">Articles, pages et types de contenus personnalisés publics publiés. Les pièces jointes sont exclues. Le QR contiendra une URL stable de type <code><?php echo esc_html(home_url('/qr/{ID}/')); ?></code>.</p>
         <?php
         $this->panel_close();
     }
@@ -718,11 +899,14 @@ final class WPQR_Plugin {
             'centerImageSizeRatio' => min((float) $options['center_image_size_ratio'], self::MAX_LOGO_RATIO),
             'maxLogoRatio' => self::MAX_LOGO_RATIO,
             'organization' => $organization,
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'siteUrl' => home_url('/'),
         ];
 
         $tabs = [
             'text' => 'Texte',
             'url' => 'Lien web',
+            'content' => 'Contenu WordPress',
             'wifi' => 'Wi-Fi',
             'phone' => 'Téléphone',
             'email' => 'E-mail',
@@ -777,6 +961,7 @@ final class WPQR_Plugin {
                 <?php
                 $this->render_panel_text($instance_id);
                 $this->render_panel_url($instance_id);
+                $this->render_panel_content($instance_id);
                 $this->render_panel_wifi($instance_id);
                 $this->render_panel_phone($instance_id);
                 $this->render_panel_email($instance_id);
@@ -854,5 +1039,8 @@ final class WPQR_Plugin {
         return (string) ob_get_clean();
     }
 }
+
+register_activation_hook(__FILE__, ['WPQR_Plugin', 'activate']);
+register_deactivation_hook(__FILE__, ['WPQR_Plugin', 'deactivate']);
 
 new WPQR_Plugin();
